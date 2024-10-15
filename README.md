@@ -34,7 +34,9 @@ pip install -r requirements.txt
 ![NIR Sensor Feedback](images/output.png)
 
 ### Workflow Example
-![Workflow Example](images/nirscan_example.jpg)
+```html
+<img src="images/nirscan_example.jpg" alt="Workflow Example" width="800">
+```
 
 ## Contributing
 Contributions are welcome! Please open an issue or submit a pull request.

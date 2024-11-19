@@ -3,9 +3,10 @@ import socket
 import time
 import os
 import csv
+from label_data import predict_label
 
 LABEL = ''
-PATH = "label.csv"
+PATH = "*.csv"
 host, port = ['192.168.1.20', 12345]
 
 def decode_file(PATH):
@@ -20,7 +21,8 @@ def get_label():
 
     while True:
         if os.path.exists(PATH):       
-            LABEL = decode_file(PATH)
+            LABEL = predict_label(PATH)
+            print(LABEL)
             os.remove(PATH)
 
 def connect_to_server():

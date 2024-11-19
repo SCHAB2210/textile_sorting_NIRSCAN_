@@ -5,6 +5,7 @@ import os
 import csv
 from label_data import predict_label
 
+
 LABEL = ''
 PATH = "*.csv"
 host, port = ['192.168.1.20', 12345]

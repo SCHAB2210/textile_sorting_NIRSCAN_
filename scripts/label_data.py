@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import glob
 from tensorflow.keras.models import load_model
+import scipy.stats
 
 # Define the preprocessing function
 def read_data(path):
@@ -19,6 +20,7 @@ def read_data(path):
 
 def predict_label(data_path, model_path):
     data, _ = read_data(data_path)
+    entropy_threshold=0.8
 
     # Convert the new data to a NumPy array
     data_arr = np.array(data)
@@ -28,6 +30,17 @@ def predict_label(data_path, model_path):
 
     # Make predictions
     predictions = model.predict(data_arr)
+
+    probabilities = model.predict(data)
+    entropies = scipy.stats.entropy(probabilities.T)
+    predictions = np.argmax(probabilities, axis=1)
+
+    # Replace predictions with 'unknown' for high entropy
+    final_predictions = [
+        pred if entropy <= entropy_threshold else 'unknown' 
+        for pred, entropy in zip(predictions, entropies)
+    ]
+    print(final_predictions)
 
     # Convert predictions to labels (if necessary)
     predicted_label = np.argmax(predictions, axis=1)[0]

@@ -3,23 +3,28 @@ import socket
 import time
 import os
 from label_data import predict_label
-import glob
 
 
 host, port = ['192.168.1.20', 12345]
 model_path = r'20241119-085834.h5'
 LABEL = ''
+label_lock = threading.Lock()
 
 def get_label():
     global LABEL
-    
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+
     while True:
-        data_path = glob.glob('*.csv')
-        if data_path:
-            LABEL = predict_label(data_path[0], model_path)
-            print(f"Predicted label: {LABEL}")
-            os.remove(data_path[0])
-        time.sleep(0.2)
+        csv_files = [f for f in os.listdir(script_dir) if f.endswith('.csv')]
+        for csv_file in csv_files:
+            data_path = os.path.join(script_dir, csv_file)
+            label = predict_label(data_path, model_path)
+            with label_lock:
+                LABEL = label
+                
+            print(f"LABEL: {LABEL}")
+            os.remove(data_path)
+
 
 def connect_to_server():
     while True:
@@ -38,10 +43,9 @@ label_thread = threading.Thread(target=get_label, daemon=True)
 label_thread.start()
 
 while True:
-    if LABEL != '':
-        client_socket.send(str(LABEL).encode('utf-8'))
+    if LABEL:
+        client_socket.send(LABEL.encode('utf-8'))
         print(f"Sent label: {LABEL}")
         LABEL = ''
-    time.sleep(0.2)
 
 client_socket.close()

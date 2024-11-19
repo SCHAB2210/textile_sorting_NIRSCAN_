@@ -31,9 +31,6 @@ def predict_label(data_path, model_path):
 
     # Convert predictions to labels (if necessary)
     predicted_label = np.argmax(predictions, axis=1)[0]
-    confidence = predictions[0][predicted_label]
-    print(confidence)
-    if confidence > 0.92:
-        return predicted_label
 
-    return ''
+    return predicted_label
+     

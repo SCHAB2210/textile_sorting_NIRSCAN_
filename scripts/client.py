@@ -4,7 +4,6 @@ import time
 import os
 from label_data import predict_label
 
-
 host, port = ['192.168.1.20', 12345]
 model_path = r'20241119-085834.h5'
 LABEL = ''
@@ -33,16 +32,12 @@ def connect_to_server():
             print(f"Connection failed: {e}. Retrying in 5 seconds...")
             time.sleep(5)
 
-#client_socket = connect_to_server()
+client_socket = connect_to_server()
 
 label_thread = threading.Thread(target=get_label, daemon=True)
 label_thread.start()
 
-while True:
-    print('t')
-    time.sleep(100)
 
-'''
 while True:
     if LABEL:
         client_socket.send(LABEL.encode('utf-8'))
@@ -50,4 +45,4 @@ while True:
         LABEL = ''
 
 client_socket.close()
-'''
+

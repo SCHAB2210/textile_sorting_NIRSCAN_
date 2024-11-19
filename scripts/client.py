@@ -2,29 +2,25 @@ import threading
 import socket
 import time
 import os
-import csv
 from label_data import predict_label
 
 
-LABEL = ''
-PATH = "*.csv"
 host, port = ['192.168.1.20', 12345]
-
-def decode_file(PATH):
-    with open(PATH, mode='r', newline='') as file:
-        csv_reader = csv.reader(file)
-        first_row = next(csv_reader)
-        print(first_row[0])
-        return first_row[0]
+model_path = r'20241119-085834.h5'
+LABEL = ''
 
 def get_label():
     global LABEL
+    script_dir = os.path.dirname(os.path.abspath(__file__))
 
     while True:
-        if os.path.exists(PATH):       
-            LABEL = predict_label(PATH)
-            print(LABEL)
-            os.remove(PATH)
+        csv_files = [f for f in os.listdir(script_dir) if f.endswith('.csv')]
+        for csv_file in csv_files:
+            data_path = os.path.join(script_dir, csv_file)
+            LABEL = predict_label(data_path, model_path)
+            print(f"LABEL: {LABEL}")
+            os.remove(data_path)
+
 
 def connect_to_server():
     while True:
@@ -37,11 +33,16 @@ def connect_to_server():
             print(f"Connection failed: {e}. Retrying in 5 seconds...")
             time.sleep(5)
 
-client_socket = connect_to_server()
+#client_socket = connect_to_server()
 
 label_thread = threading.Thread(target=get_label, daemon=True)
 label_thread.start()
 
+while True:
+    print('t')
+    time.sleep(100)
+
+'''
 while True:
     if LABEL:
         client_socket.send(LABEL.encode('utf-8'))
@@ -49,3 +50,4 @@ while True:
         LABEL = ''
 
 client_socket.close()
+'''

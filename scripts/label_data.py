@@ -17,21 +17,20 @@ def read_data(path):
     appended_data = pd.concat(appended_data)
     return appended_data, peak_abs
 
-def predict_label(path_new_data):
-    new_data, _ = read_data(path_new_data)
+def predict_label(data_path, model_path):
+    data, _ = read_data(data_path)
 
     # Convert the new data to a NumPy array
-    new_data_arr = np.array(new_data)
+    data_arr = np.array(data)
 
     # Load the trained model
-    model_save_path = r'20241119-085834.h5'
-    model = load_model(model_save_path)
+    model = load_model(model_path)
 
     # Make predictions
-    predictions = model.predict(new_data_arr)
+    predictions = model.predict(data_arr)
 
     # Convert predictions to labels (if necessary)
-    predicted_labels = np.argmax(predictions, axis=1)
+    predicted_label = np.argmax(predictions, axis=1)[0]
 
-    return predicted_labels
+    return predicted_label
      

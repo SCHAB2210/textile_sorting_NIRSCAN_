@@ -6,7 +6,7 @@ import glob
 from label_data import predict_label
 
 host, port = ['192.168.1.20', 12345]
-model_path = '20241119-085834.h5'
+model_path = r'model/20241119-085834.h5'
 LABEL = ''
 running = True  # Global variable to control the running state
 

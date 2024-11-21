@@ -35,18 +35,7 @@ def predict_label(data_path, model_path):
     entropies = scipy.stats.entropy(probabilities.T)
     predictions = np.argmax(probabilities, axis=1)
 
-    # Replace predictions with 'unknown' for high entropy
-    final_predictions = [
-        pred if entropy <= entropy_threshold else 'unknown' 
-        for pred, entropy in zip(predictions, entropies)
-    ]
-    print(final_predictions)
-
     # Convert predictions to labels (if necessary)
     predicted_label = np.argmax(predictions, axis=1)[0]
-    confidence = predictions[0][predicted_label]
-    print(confidence)
-    if confidence > 0.92:
-        return predicted_label
 
-    return ''
+    return predicted_label

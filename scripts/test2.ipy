@@ -1,0 +1,116 @@
+import numpy as np
+import pandas as pd
+import os
+import datetime
+import matplotlib.pyplot as plt
+from sklearn.model_selection import StratifiedKFold
+from sklearn.preprocessing import StandardScaler
+from tensorflow.keras.utils import to_categorical
+from tensorflow.keras import Sequential
+from tensorflow.keras.layers import Conv1D, BatchNormalization, MaxPooling1D, Flatten, Dense, Dropout
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.losses import CategoricalCrossentropy
+from tensorflow.keras.metrics import CategoricalAccuracy, AUC, Precision, Recall
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, TensorBoard
+from tensorflow.keras.regularizers import L2
+
+# Load Data
+data = pd.read_csv('data_cotton_wool_polyester.csv')
+x = data.drop(columns=['class'])
+y = data['class']
+
+# Standardize Features
+scaler = StandardScaler()
+x_scaled = scaler.fit_transform(x)
+
+# Add Random Noise for Augmentation
+noise_factor = 0.01
+x_augmented = np.concatenate([x_scaled, x_scaled + noise_factor * np.random.normal(size=x_scaled.shape)], axis=0)
+y_augmented = np.concatenate([y, y])
+
+# K-Fold Cross-Validation
+skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+fold = 1
+
+for train_index, val_index in skf.split(x_augmented, y_augmented):
+    print(f"Training Fold {fold}...")
+
+    # Split Data
+    x_train, x_val = x_augmented[train_index], x_augmented[val_index]
+    y_train, y_val = y_augmented[train_index], y_augmented[val_index]
+
+    # One-Hot Encode Labels
+    y_train_ohe = to_categorical(y_train, num_classes=3)
+    y_val_ohe = to_categorical(y_val, num_classes=3)
+
+    # Reshape for Conv1D
+    x_train = np.expand_dims(x_train, axis=-1)
+    x_val = np.expand_dims(x_val, axis=-1)
+
+    # Define Model
+    model = Sequential([
+        Conv1D(32, kernel_size=5, activation='relu', input_shape=(x_train.shape[1], 1), kernel_regularizer=L2(0.01)),
+        BatchNormalization(),
+        MaxPooling1D(pool_size=2),
+        Dropout(0.2),
+
+        Conv1D(64, kernel_size=5, activation='relu', padding="same", kernel_regularizer=L2(0.01)),
+        BatchNormalization(),
+        MaxPooling1D(pool_size=2),
+        Dropout(0.3),
+
+        Conv1D(128, kernel_size=5, activation='relu', padding="same", kernel_regularizer=L2(0.01)),
+        BatchNormalization(),
+        MaxPooling1D(pool_size=2),
+        Dropout(0.4),
+
+        Flatten(),
+        Dense(128, activation='relu', kernel_regularizer=L2(0.01)),
+        Dropout(0.5),
+        Dense(3, activation='softmax')
+    ])
+
+    model.compile(
+        optimizer=Adam(learning_rate=1e-3),
+        loss=CategoricalCrossentropy(),
+        metrics=[CategoricalAccuracy(name='accuracy'), AUC(name='auc'), Precision(name='precision'), Recall(name='recall')]
+    )
+
+    # Define Callbacks
+    log_dir = f"logs/fold_{fold}_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    callbacks = [
+        EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True),
+        ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5, min_lr=1e-6, verbose=1),
+        TensorBoard(log_dir=log_dir, histogram_freq=1)
+    ]
+
+    # Train Model
+    history = model.fit(
+        x_train, y_train_ohe,
+        validation_data=(x_val, y_val_ohe),
+        epochs=100,
+        batch_size=64,
+        verbose=1,
+        callbacks=callbacks
+    )
+
+    # Save Model
+    model_save_path = f"model_fold_{fold}.h5"
+    model.save(model_save_path)
+    print(f"Model for fold {fold} saved at: {model_save_path}")
+
+    # Plot Loss
+    plt.figure(figsize=(10, 6))
+    plt.plot(history.history['loss'], label='Train Loss')
+    plt.plot(history.history['val_loss'], label='Validation Loss')
+    plt.title(f"Fold {fold} Loss Curve")
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.show()
+
+    fold += 1
+
+# Final Observations
+print("All folds completed. Evaluate saved models on test data for final performance metrics.")
+ 

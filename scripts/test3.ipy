@@ -1,0 +1,91 @@
+import numpy as np
+import pandas as pd
+from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.models import load_model
+from sklearn.metrics import confusion_matrix, classification_report
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# %% Load Test Data
+# Assuming x_test and y_test are available and prepared
+# If not, load your test dataset here
+data = pd.read_csv('samples/data_cotton_wool_polyester.csv')
+
+# Split into features and labels
+y = data['class']
+x = data.drop(columns=['class'])
+
+# Split the dataset (reproduce splits)
+from sklearn.model_selection import train_test_split
+
+# Train-Test-Validation Splits
+x_train, x_temp, y_train, y_temp = train_test_split(x, y, test_size=0.3, random_state=42, stratify=y)
+x_val, x_test, y_val, y_test = train_test_split(x_temp, y_temp, test_size=0.5, random_state=42, stratify=y_temp)
+
+# One-hot encode the test labels
+y_test_ohe = to_categorical(y_test, num_classes=3)
+
+# Reshape test data for Conv1D input
+x_test = np.expand_dims(x_test, axis=-1)
+
+# %% Load the Trained Model
+model_path = "model_fold_4.h5"  # Replace with the actual trained model file path
+model = load_model(model_path)
+
+# %% Evaluate the Model
+print("Evaluating the model on the test dataset...")
+test_results = model.evaluate(x_test, y_test_ohe, batch_size=64, verbose=1)
+
+# Display metrics
+print("\nTest Metrics:")
+for metric_name, metric_value in zip(model.metrics_names, test_results):
+    print(f"{metric_name}: {metric_value:.4f}")
+
+# %% Make Predictions
+print("\nGenerating predictions...")
+predictions = model.predict(x_test)
+
+# Convert predictions to class labels
+predicted_labels = np.argmax(predictions, axis=1)
+
+# Convert one-hot test labels to class indices
+true_labels = np.argmax(y_test_ohe, axis=1)
+
+# %% Confusion Matrix
+print("\nConfusion Matrix:")
+conf_matrix = confusion_matrix(true_labels, predicted_labels)
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=['Cotton', 'Wool', 'Polyester'], yticklabels=['Cotton', 'Wool', 'Polyester'])
+plt.xlabel('Predicted')
+plt.ylabel('Actual')
+plt.title('Confusion Matrix')
+plt.show()
+
+# Classification Report
+print("\nClassification Report:")
+report = classification_report(true_labels, predicted_labels, target_names=['Cotton', 'Wool', 'Polyester'])
+print(report)
+
+# %% Visualize Predictions
+print("\nVisualizing test samples and predictions...")
+for i in range(5):  # Change range for more examples
+    plt.figure()
+    plt.plot(x_test[i].squeeze(), label='Test Sample')
+    plt.title(f"True Label: {true_labels[i]}, Predicted Label: {predicted_labels[i]}")
+    plt.legend()
+    plt.show()
+
+# %% Save the Final Model (Optional)
+# If this is your best model and you're satisfied with the performance, save it
+final_model_path = "final_trained_model.h5"
+model.save(final_model_path)
+print(f"Final model saved at: {final_model_path}")
+
+# %% Export to TensorFlow Lite (Optional)
+# For deployment on edge devices
+converter = tf.lite.TFLiteConverter.from_saved_model(final_model_path)
+tflite_model = converter.convert()
+
+# Save the TFLite model
+with open("model.tflite", "wb") as f:
+    f.write(tflite_model)
+print("Model exported to TensorFlow Lite format: model.tflite")

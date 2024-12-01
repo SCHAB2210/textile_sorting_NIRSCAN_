@@ -16,4 +16,3 @@ pip install -r requirements.txt
 2. Navigate to the project directory.
 3. Install the required dependencies using the command above.
 4. Run the provided scripts to train and evaluate the machine learning models.
-

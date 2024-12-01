@@ -28,7 +28,7 @@ pip install -r requirements.txt
 
 ## Results
 ### Training Loss
-![Training Loss](images\loss.png)
+![Training Loss](images/loss.png)
 
 ### NIR Sensor Feedback
 ![NIR Sensor Feedback](images/output.png)

@@ -17,7 +17,7 @@ This project leverages NIR spectroscopy to sort textiles on a conveyor belt. The
 To get started, clone the repository and install the required dependencies:
 ```bash
 git clone https://github.com/yourusername/textile_sorting_NIRSCAN.git
-cd textile_sorting_NIRSCAN
+cd textile_sorting_NIRSCAN/ML
 pip install -r requirements.txt
 ```
 

@@ -28,13 +28,13 @@ pip install -r requirements.txt
 
 ## Results
 ### Training Loss
-![Training Loss](textile_sorting_NIRSCAN_\ML\images\loss.png)
+![Training Loss](images\loss.png)
 
 ### NIR Sensor Feedback
-![NIR Sensor Feedback](textile_sorting_NIRSCAN_ML\images/output.png)
+![NIR Sensor Feedback](images/output.png)
 
 ### Workflow Example
-![Workflow Example](textile_sorting_NIRSCAN_ML\images/nirscan_example.jpg)
+![Workflow Example](images/nirscan_example.jpg)
 
 ## Contributing
 Contributions are welcome! Please open an issue or submit a pull request.

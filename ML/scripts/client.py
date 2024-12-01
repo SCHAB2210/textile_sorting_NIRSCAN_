@@ -6,7 +6,7 @@ import glob
 from label_data import predict_label
 
 host, port = ['192.168.1.20', 12345]
-model_path = r'scripts\model\trained_model_20241121-175654.h5'
+model_path = r'scripts\model\trained_model_20241121-175654.h5' # Path to the trained model
 LABEL = ''
 running = True
 

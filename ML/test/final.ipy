@@ -1,0 +1,121 @@
+# %% Imports
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+from sklearn.model_selection import train_test_split
+from tensorflow.keras.utils import to_categorical
+from sklearn.metrics import confusion_matrix, classification_report
+import seaborn as sns
+import matplotlib.pyplot as plt
+from collections import Counter
+
+# %% Load Data
+data = pd.read_csv(r'samples\data_cotton_wool_polyester.csv')
+
+# Separate features and labels
+x = data.drop(columns=['class']).values
+y = data['class'].values
+
+# Stratified train-test split
+x_train, x_temp, y_train, y_temp = train_test_split(
+    x, y, test_size=0.3, random_state=42, stratify=y
+)
+
+# Split temp data into validation and test sets
+x_val, x_test, y_val, y_test = train_test_split(
+    x_temp, y_temp, test_size=0.5, random_state=42, stratify=y_temp
+)
+
+# One-hot encode labels
+y_train_ohe = to_categorical(y_train, num_classes=3)
+y_val_ohe = to_categorical(y_val, num_classes=3)
+y_test_ohe = to_categorical(y_test, num_classes=3)
+
+# Reshape inputs for Conv1D
+x_train = np.expand_dims(x_train, axis=-1)
+x_val = np.expand_dims(x_val, axis=-1)
+x_test = np.expand_dims(x_test, axis=-1)
+
+# %% Balance Data with Class Weights
+class_counts = Counter(y_train)
+total_samples = sum(class_counts.values())
+class_weights = {cls: total_samples / (3 * count) for cls, count in class_counts.items()}
+print("Class Weights:", class_weights)
+
+# %% Model Definition
+def make_model(input_shape):
+    model = tf.keras.Sequential([
+        tf.keras.layers.Conv1D(64, kernel_size=5, activation='relu', input_shape=input_shape),
+        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.MaxPooling1D(pool_size=2),
+
+        tf.keras.layers.Conv1D(128, kernel_size=5, activation='relu', padding="same"),
+        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.MaxPooling1D(pool_size=2),
+
+        tf.keras.layers.Conv1D(256, kernel_size=5, activation='relu', padding="same"),
+        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.MaxPooling1D(pool_size=2),
+
+        tf.keras.layers.Flatten(),
+        tf.keras.layers.Dense(256, activation='relu', kernel_regularizer=tf.keras.regularizers.L2(0.01)),
+        tf.keras.layers.Dropout(0.4),
+
+        tf.keras.layers.Dense(128, activation='relu', kernel_regularizer=tf.keras.regularizers.L2(0.01)),
+        tf.keras.layers.Dropout(0.4),
+
+        tf.keras.layers.Dense(3, activation='softmax')
+    ])
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
+        loss='categorical_crossentropy',
+        metrics=['accuracy', tf.keras.metrics.AUC(name='auc'), tf.keras.metrics.Precision(), tf.keras.metrics.Recall()]
+    )
+    return model
+
+# Create the model
+model = make_model(input_shape=(x_train.shape[1], 1))
+model.summary()
+
+# %% Callbacks
+callbacks = [
+    tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5, min_lr=1e-6, verbose=1),
+    tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True, verbose=1),
+    tf.keras.callbacks.ModelCheckpoint(filepath='best_model.h5', monitor='val_loss', save_best_only=True, verbose=1)
+]
+
+# %% Training
+history = model.fit(
+    x_train,
+    y_train_ohe,
+    validation_data=(x_val, y_val_ohe),
+    epochs=15,
+    batch_size=32,
+    class_weight=class_weights,
+    callbacks=callbacks,
+    verbose=1
+)
+
+# Save the final model
+#model.save('final_model.h5')
+
+# %% Evaluate Model
+test_loss, test_accuracy, test_auc, test_precision, test_recall = model.evaluate(x_test, y_test_ohe, verbose=0)
+print(f"Test Accuracy: {test_accuracy:.4f}")
+print(f"Test AUC: {test_auc:.4f}")
+print(f"Test Precision: {test_precision:.4f}")
+print(f"Test Recall: {test_recall:.4f}")
+
+# %% Confusion Matrix
+y_pred = np.argmax(model.predict(x_test), axis=-1)
+cm = confusion_matrix(np.argmax(y_test_ohe, axis=1), y_pred)
+
+plt.figure(figsize=(8, 6))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=['Cotton', 'Wool', 'Polyester'], yticklabels=['Cotton', 'Wool', 'Polyester'])
+plt.xlabel('Predicted')
+plt.ylabel('Actual')
+plt.title('Confusion Matrix')
+plt.show()
+
+# %% Classification Report
+print(classification_report(np.argmax(y_test_ohe, axis=1), y_pred, target_names=['Cotton', 'Wool', 'Polyester']))

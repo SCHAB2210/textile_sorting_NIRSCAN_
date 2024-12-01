@@ -1,0 +1,167 @@
+# %% Imports
+import numpy as np
+import pandas as pd
+import os
+from sklearn.model_selection import StratifiedKFold
+from sklearn.preprocessing import StandardScaler
+from sklearn.utils import shuffle
+from tensorflow.keras.utils import to_categorical
+from tensorflow.keras import Sequential
+from tensorflow.keras.layers import Conv1D, BatchNormalization, MaxPooling1D, Flatten, Dense, Dropout
+from tensorflow.keras.callbacks import ReduceLROnPlateau, EarlyStopping, TensorBoard
+from sklearn.metrics import classification_report, confusion_matrix
+import matplotlib.pyplot as plt
+import seaborn as sns
+import datetime
+
+# %% Load Data
+data = pd.read_csv('data_cotton_wool_polyester.csv')
+
+# Split features and labels
+y = data['class']
+x = data.drop(columns=['class'])
+
+# Verify unique classes
+print("Unique classes in the dataset:", np.unique(y))
+
+# %% Augmentation Helper Functions
+def augment_data(x, y, augmentation_ratio=0.5):
+    """Applies data augmentation to x and flips a small portion of labels."""
+    n_samples = int(len(x) * augmentation_ratio)
+    indices = np.random.choice(len(x), n_samples, replace=False)
+    x_augmented = x.iloc[indices] + np.random.normal(0, 0.01, x.iloc[indices].shape)  # Add Gaussian noise
+    y_augmented = y.iloc[indices].copy()
+
+    return pd.concat([x, x_augmented]), pd.concat([y, y_augmented])
+
+def flip_labels(y, flip_ratio=0.05):
+    """Randomly flips a fraction of labels."""
+    n_flips = int(len(y) * flip_ratio)
+    indices = np.random.choice(len(y), n_flips, replace=False)
+    y_flipped = y.copy()
+    y_flipped.iloc[indices] = np.random.choice([0, 1, 2], n_flips)  # Valid class labels only
+    return y_flipped
+
+# %% Data Augmentation
+x_augmented, y_augmented = augment_data(x, y, augmentation_ratio=0.5)
+y_augmented_noisy = flip_labels(y_augmented, flip_ratio=0.05)
+
+# Verify augmented data
+print("Unique classes after augmentation:", np.unique(y_augmented_noisy))
+
+# %% Stratified K-Fold Cross-Validation
+skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+train_index, val_index = next(skf.split(x_augmented, y_augmented_noisy))
+
+x_train, x_val = x_augmented.iloc[train_index], x_augmented.iloc[val_index]
+y_train, y_val = y_augmented_noisy.iloc[train_index], y_augmented_noisy.iloc[val_index]
+
+# Verify split
+print("Unique classes in training set:", np.unique(y_train))
+print("Unique classes in validation set:", np.unique(y_val))
+
+# %% Preprocessing
+# One-hot encode labels
+y_train_ohe = to_categorical(y_train, num_classes=3)
+y_val_ohe = to_categorical(y_val, num_classes=3)
+
+# Standardize features
+scaler = StandardScaler()
+x_train = scaler.fit_transform(x_train)
+x_val = scaler.transform(x_val)
+
+# Reshape for Conv1D input
+x_train = np.expand_dims(x_train, axis=-1)
+x_val = np.expand_dims(x_val, axis=-1)
+
+# %% Model Definition
+def create_complex_model(input_shape):
+    """Defines a deep and complex Conv1D model."""
+    model = Sequential([
+        Conv1D(64, kernel_size=5, activation='relu', input_shape=input_shape),
+        BatchNormalization(),
+        MaxPooling1D(pool_size=2),
+
+        Conv1D(128, kernel_size=5, activation='relu', padding="same"),
+        BatchNormalization(),
+        MaxPooling1D(pool_size=2),
+
+        Conv1D(256, kernel_size=5, activation='relu', padding="same"),
+        BatchNormalization(),
+        MaxPooling1D(pool_size=2),
+
+        Conv1D(512, kernel_size=3, activation='relu', padding="same"),
+        BatchNormalization(),
+        MaxPooling1D(pool_size=2),
+
+        Flatten(),
+        Dense(512, activation='relu'),
+        Dropout(0.5),
+        Dense(256, activation='relu'),
+        Dropout(0.5),
+        Dense(128, activation='relu'),
+        Dropout(0.5),
+        Dense(3, activation='softmax')  # 3 classes
+    ])
+    model.compile(
+        optimizer='adam',
+        loss='categorical_crossentropy',
+        metrics=['accuracy']
+    )
+    return model
+
+# Create model
+model = create_complex_model(input_shape=(x_train.shape[1], 1))
+model.summary()
+
+# %% Callbacks
+log_path = r'scripts\model'
+ap_name = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+model_save_path = os.path.join(log_path, f"trained_model_{ap_name}.h5")
+log_dir = os.path.join(log_path, f"logs_{ap_name}")
+
+tensorboard_callback = TensorBoard(log_dir=log_dir, histogram_freq=1)
+reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5, min_lr=1e-6, verbose=1)
+early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True, verbose=1)
+
+# %% Training
+history = model.fit(
+    x_train, y_train_ohe,
+    validation_data=(x_val, y_val_ohe),
+    epochs=100,
+    batch_size=64,
+    callbacks=[tensorboard_callback, reduce_lr, early_stopping]
+)
+
+# Save model
+model.save(model_save_path)
+print(f"Model saved at: {model_save_path}")
+
+# %% Evaluate and Plot Results
+def plot_training_history(history):
+    """Plots training history."""
+    plt.figure(figsize=(10, 6))
+    plt.plot(history.history['accuracy'], label='Training Accuracy')
+    plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+    plt.plot(history.history['loss'], label='Training Loss')
+    plt.plot(history.history['val_loss'], label='Validation Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Accuracy/Loss')
+    plt.legend()
+    plt.title('Training History')
+    plt.show()
+
+plot_training_history(history)
+
+# %% Confusion Matrix
+y_val_pred = np.argmax(model.predict(x_val), axis=1)
+y_val_true = np.argmax(y_val_ohe, axis=1)
+
+cm = confusion_matrix(y_val_true, y_val_pred)
+sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=["Cotton", "Wool", "Polyester"], yticklabels=["Cotton", "Wool", "Polyester"])
+plt.title("Confusion Matrix")
+plt.xlabel("Predicted Label")
+plt.ylabel("True Label")
+plt.show()
+
+print("Classification Report:\n", classification_report(y_val_true, y_val_pred, target_names=["Cotton", "Wool", "Polyester"]))

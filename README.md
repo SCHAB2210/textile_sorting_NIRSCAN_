@@ -28,13 +28,13 @@ pip install -r requirements.txt
 
 ## Results
 ### Training Loss
-![Training Loss](images/loss.png)
+![Training Loss](ML\images\loss.png/loss.png)
 
 ### NIR Sensor Feedback
-![NIR Sensor Feedback](images/output.png)
+![NIR Sensor Feedback](ML\images/output.png)
 
 ### Workflow Example
-![Workflow Example](images/nirscan_example.jpg)
+![Workflow Example](ML\images/nirscan_example.jpg)
 
 ## Contributing
 Contributions are welcome! Please open an issue or submit a pull request.
